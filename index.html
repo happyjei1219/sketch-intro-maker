@@ -1,0 +1,458 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<style>body{margin:0}</style>
+</head>
+<body>
+<title>스케치 인트로 메이커</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Gowun+Batang:wght@700&family=Noto+Sans+KR:wght@400;500;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: drawing stage on the left like an easel, numbered work steps on the right; stacks on phones */
+:root{
+  --bg:#F2F2EF; --surface:#FFFFFF; --ink:#1E2227; --muted:#676C73; --line:#DADBD6;
+  --accent:#36588A; --accent-ink:#FFFFFF; --wash:rgba(54,88,138,.10); --stage:#E6E5E0;
+  --ok:#2F7D4F; --warn:#A5612A;
+  --f-display:"Gowun Batang","Noto Serif KR",serif;
+  --f-body:"Noto Sans KR","Apple SD Gothic Neo","Malgun Gothic",system-ui,sans-serif;
+  --f-mono:"IBM Plex Mono",ui-monospace,Consolas,monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#16181B; --surface:#1F2226; --ink:#E7E8EA; --muted:#9BA1A8; --line:#32363C;
+  --accent:#8EAFE2; --accent-ink:#10141A; --wash:rgba(142,175,226,.12); --stage:#0F1113;
+  --ok:#6CC08E; --warn:#E0A06A; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#16181B; --surface:#1F2226; --ink:#E7E8EA; --muted:#9BA1A8; --line:#32363C;
+  --accent:#8EAFE2; --accent-ink:#10141A; --wash:rgba(142,175,226,.12); --stage:#0F1113;
+  --ok:#6CC08E; --warn:#E0A06A; color-scheme:dark}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+body{background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:15px;line-height:1.55;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:20px 40px}
+.wrap{max-width:1280px;margin:0 auto;display:flex;flex-direction:column;gap:20px}
+header{display:flex;flex-wrap:wrap;align-items:baseline;gap:6px 16px}
+h1{font-family:var(--f-display);font-size:clamp(24px,3vw,32px);margin:0;letter-spacing:-.01em;text-wrap:balance}
+header p{margin:0;color:var(--muted)}
+.grid{display:grid;grid-template-columns:minmax(0,1fr) 360px;gap:20px;align-items:start}
+@media (max-width:900px){.grid{grid-template-columns:minmax(0,1fr)}}
+.stagecol{display:flex;flex-direction:column;gap:12px;min-width:0}
+.stage{position:relative;background:var(--stage);border-radius:10px;overflow:hidden;display:flex;align-items:center;justify-content:center;
+  aspect-ratio:16/9;max-width:100%;cursor:crosshair}
+.stage canvas{max-width:100%;max-height:100%;display:block}
+#marker{position:absolute;width:34px;height:34px;margin:-17px 0 0 -17px;pointer-events:none;border-radius:50%;
+  border:2px solid #fff;box-shadow:0 0 0 2px var(--accent),0 2px 10px rgba(0,0,0,.35)}
+#marker::after{content:"";position:absolute;left:50%;top:50%;width:6px;height:6px;margin:-3px;border-radius:50%;background:var(--accent)}
+.hint{position:absolute;left:12px;bottom:12px;background:rgba(20,22,25,.72);color:#fff;font-size:13px;padding:6px 10px;border-radius:6px;pointer-events:none}
+#busy{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(20,22,25,.45);color:#fff;font-weight:500}
+.transport{display:flex;flex-wrap:wrap;align-items:center;gap:10px}
+.phases{display:flex;flex-wrap:wrap;gap:6px;margin-left:auto}
+.phase{font-size:12.5px;padding:3px 10px;border-radius:999px;border:1px solid var(--line);color:var(--muted)}
+.phase.on{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.time{font-family:var(--f-mono);font-variant-numeric:tabular-nums;color:var(--muted);font-size:13px}
+aside{display:flex;flex-direction:column;gap:14px;min-width:0}
+.step{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:16px;display:flex;flex-direction:column;gap:10px}
+.step h2{margin:0;font-size:15px;display:flex;gap:8px;align-items:center}
+.step h2 b{font-family:var(--f-mono);font-weight:500;font-size:12px;width:22px;height:22px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;background:var(--wash);color:var(--accent)}
+.step p{margin:0;color:var(--muted);font-size:13.5px}
+.drop{border:1.5px dashed var(--line);border-radius:8px;padding:14px;text-align:center;cursor:pointer;color:var(--muted);font-size:13.5px}
+.drop.over{border-color:var(--accent);background:var(--wash);color:var(--ink)}
+.drop strong{color:var(--accent)}
+.fname{font-size:13px;color:var(--muted);overflow-wrap:anywhere}
+.row{display:flex;flex-direction:column;gap:6px}
+.row>span{font-size:13px;color:var(--muted)}
+.seg{display:flex;flex-wrap:wrap;border:1px solid var(--line);border-radius:8px;overflow:hidden}
+.seg button{flex:1 1 auto;border:0;background:transparent;color:var(--ink);font:inherit;font-size:13.5px;padding:7px 8px;cursor:pointer;border-left:1px solid var(--line)}
+.seg button:first-child{border-left:0}
+.seg button[aria-pressed="true"]{background:var(--accent);color:var(--accent-ink)}
+button.btn{font:inherit;font-weight:500;border-radius:8px;padding:9px 16px;cursor:pointer;border:1px solid var(--line);background:var(--surface);color:var(--ink)}
+button.btn.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+button.btn:disabled{opacity:.45;cursor:not-allowed}
+button:focus-visible,.drop:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.bar{height:8px;border-radius:999px;background:var(--wash);overflow:hidden}
+.bar i{display:block;height:100%;width:0;background:var(--accent);transition:width .15s}
+.result{display:flex;flex-direction:column;gap:8px}
+.result video{width:100%;border-radius:8px;background:var(--stage)}
+.msg{font-size:13.5px}
+.msg.ok{color:var(--ok)} .msg.err{color:var(--warn)}
+.tip{font-size:13px;color:var(--muted);border-top:1px solid var(--line);padding-top:10px}
+.mono{font-family:var(--f-mono);font-variant-numeric:tabular-nums}
+@media (prefers-reduced-motion:reduce){.bar i{transition:none}}
+</style>
+
+<div class="wrap">
+  <header>
+    <h1>스케치 인트로 메이커</h1>
+    <p>이미지 한 장을 연필 스케치에서 붓 채색으로 완성되는 인트로 영상(MP4)으로 만듭니다.</p>
+  </header>
+
+  <div class="grid">
+    <section class="stagecol" aria-label="미리보기">
+      <div class="stage" id="stage">
+        <canvas id="out" width="1920" height="1080"></canvas>
+        <div id="marker" hidden></div>
+        <div class="hint" id="hint">그림을 클릭하면 그 지점부터 그리기 시작합니다</div>
+        <div id="busy" hidden>이미지를 분석하는 중…</div>
+      </div>
+      <div class="transport">
+        <button class="btn primary" id="play">미리보기 재생</button>
+        <button class="btn" id="stop" disabled>정지</button>
+        <span class="time" id="time">0.0 / 24.0초</span>
+        <div class="phases" aria-label="진행 단계">
+          <span class="phase" data-p="line">선 그리기</span>
+          <span class="phase" data-p="shade">음영</span>
+          <span class="phase" data-p="paint">붓 채색</span>
+          <span class="phase" data-p="done">완성</span>
+        </div>
+      </div>
+    </section>
+
+    <aside>
+      <div class="step">
+        <h2><b>1</b>이미지</h2>
+        <div class="drop" id="drop" tabindex="0" role="button" aria-label="이미지 파일 선택">
+          <strong>이미지 선택</strong> 또는 여기로 끌어다 놓기<br>JPG · PNG · WEBP
+        </div>
+        <input type="file" id="file" accept="image/*" hidden>
+        <div class="fname" id="fname">예시 이미지가 열려 있습니다. 내 이미지를 올려 바꾸세요.</div>
+      </div>
+
+      <div class="step">
+        <h2><b>2</b>시작점</h2>
+        <p>가장 먼저 그려질 곳을 그림에서 클릭하세요. 인물은 얼굴, 풍경은 주인공(건물·자동차 등)이 좋습니다. 채색 방향을 '시작점에서 퍼지기'로 두면 색도 이 지점부터 칠해지고, '가장자리에서 모이기'는 이 지점에서 마지막으로 끝납니다.</p>
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+          <button class="btn" id="center">가운데로</button>
+          <span class="fname mono" id="pt"></span>
+        </div>
+      </div>
+
+      <div class="step">
+        <h2><b>3</b>설정</h2>
+        <div class="row"><span>화면 비율</span>
+          <div class="seg" data-opt="aspect"><button data-v="169" aria-pressed="true">16:9 유튜브</button><button data-v="916">9:16 쇼츠</button><button data-v="orig">원본 비율</button></div></div>
+        <div class="row"><span>길이</span>
+          <div class="seg" data-opt="dur"><button data-v="15">15초</button><button data-v="20">20초</button><button data-v="24" aria-pressed="true">24초</button><button data-v="30">30초</button></div></div>
+        <div class="row"><span>해상도</span>
+          <div class="seg" data-opt="res"><button data-v="1080" aria-pressed="true">1080p</button><button data-v="720">720p</button></div></div>
+        <div class="row"><span>선 색</span>
+          <div class="seg" data-opt="tone"><button data-v="pencil" aria-pressed="true">연필 회색</button><button data-v="sepia">세피아</button></div></div>
+        <div class="row"><span>선 밀도</span>
+          <div class="seg" data-opt="density"><button data-v="fine">섬세하게</button><button data-v="normal" aria-pressed="true">보통</button><button data-v="bold">진하게</button></div></div>
+        <div class="row"><span>채색 방향</span>
+          <div class="seg" data-opt="paint"><button data-v="out" aria-pressed="true">시작점에서 퍼지기</button><button data-v="in">가장자리에서 모이기</button><button data-v="left">왼쪽부터</button><button data-v="top">위에서부터</button></div></div>
+      </div>
+
+      <div class="step">
+        <h2><b>4</b>MP4 만들기</h2>
+        <button class="btn primary" id="make">MP4 만들기</button>
+        <div class="bar" aria-hidden="true"><i id="prog"></i></div>
+        <div class="msg" id="msg">설정을 마치면 만들기를 누르세요.</div>
+        <div class="result" id="result" hidden>
+          <video id="vid" controls playsinline muted></video>
+          <button class="btn primary" id="save">MP4 저장</button>
+        </div>
+        <div class="tip">캡컷에서는 이 영상을 맨 앞에 두고, 같은 원본 이미지를 바로 뒤에 103% 크기로 이어 붙인 다음 음악을 깔면 끊김 없이 이어집니다.</div>
+      </div>
+    </aside>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/mp4-muxer@5.2.2/build/mp4-muxer.js"></script>
+<script>
+"use strict";
+const $=id=>document.getElementById(id);
+const out=$('out'), octx=out.getContext('2d');
+const opts={aspect:'169',dur:24,res:1080,tone:'pencil',density:'normal',paint:'out'};
+const FPS=30;
+let img=null, G=null, A=null, playing=false, busy=false, resultBlob=null, resultExt='mp4';
+const dlP=(window.claude&&window.claude.use)?window.claude.use('downloads').catch(()=>null):Promise.resolve(null);
+
+/* ---------- utilities ---------- */
+const sleep=ms=>new Promise(r=>setTimeout(r,ms));
+const tick=()=>new Promise(r=>setTimeout(r,0));
+function rng(seed){let a=seed>>>0;return()=>{a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296}}
+const ss=x=>{x=x<0?0:x>1?1:x;return x*x*(3-2*x)};
+function boxes(sigma){const n=3,wI=Math.sqrt(12*sigma*sigma/n+1);let wl=Math.floor(wI);if(wl%2===0)wl--;const wu=wl+2;
+  const m=Math.round((12*sigma*sigma-n*wl*wl-4*n*wl-3*n)/(-4*wl-4));return [0,1,2].map(i=>i<m?wl:wu)}
+function boxH(s,d,w,h,r){const k=1/(2*r+1);for(let y=0;y<h;y++){const o=y*w;let acc=0;
+  for(let j=-r;j<=r;j++)acc+=s[o+Math.min(w-1,Math.max(0,j))];
+  for(let x=0;x<w;x++){d[o+x]=acc*k;acc+=s[o+Math.min(w-1,x+r+1)]-s[o+Math.max(0,x-r)]}}}
+function boxV(s,d,w,h,r){const k=1/(2*r+1);for(let x=0;x<w;x++){let acc=0;
+  for(let j=-r;j<=r;j++)acc+=s[Math.min(h-1,Math.max(0,j))*w+x];
+  for(let y=0;y<h;y++){d[y*w+x]=acc*k;acc+=s[Math.min(h-1,y+r+1)*w+x]-s[Math.max(0,y-r)*w+x]}}}
+function blur(src,w,h,sigma){if(sigma<0.5)return Float32Array.from(src);let a=Float32Array.from(src),b=new Float32Array(w*h);
+  for(const s of boxes(sigma)){const r=(s-1)>>1;if(r<1)continue;boxH(a,b,w,h,r);boxV(b,a,w,h,r)}return a}
+function mkCanvas(w,h){const c=document.createElement('canvas');c.width=w;c.height=h;return c}
+
+/* remove 8-connected components smaller than min */
+function removeSmall(bin,w,h,min){const lab=new Uint8Array(w*h),stack=new Int32Array(w*h),comp=[];
+  for(let i=0;i<w*h;i++){if(!bin[i]||lab[i])continue;let sp=0,n=0;stack[sp++]=i;lab[i]=1;comp.length=0;
+    while(sp){const p=stack[--sp];comp.push(p);n++;const x=p%w,y=(p/w)|0;
+      for(let dy=-1;dy<=1;dy++){const yy=y+dy;if(yy<0||yy>=h)continue;for(let dx=-1;dx<=1;dx++){const xx=x+dx;if(xx<0||xx>=w)continue;
+        const q=yy*w+xx;if(bin[q]&&!lab[q]){lab[q]=1;stack[sp++]=q}}}}
+    if(n<min)for(const p of comp)bin[p]=0}}
+/* Zhang-Suen thinning */
+function thin(b,w,h){for(let x=0;x<w;x++){b[x]=0;b[(h-1)*w+x]=0}for(let y=0;y<h;y++){b[y*w]=0;b[y*w+w-1]=0}
+  let pts=[];for(let i=0;i<w*h;i++)if(b[i])pts.push(i);
+  let changed=true;const del=[];
+  while(changed){changed=false;for(let step=0;step<2;step++){del.length=0;
+    for(const p of pts){if(!b[p])continue;
+      const p2=b[p-w],p3=b[p-w+1],p4=b[p+1],p5=b[p+w+1],p6=b[p+w],p7=b[p+w-1],p8=b[p-1],p9=b[p-w-1];
+      const B=p2+p3+p4+p5+p6+p7+p8+p9;if(B<2||B>6)continue;
+      const A=(!p2&&p3)+(!p3&&p4)+(!p4&&p5)+(!p5&&p6)+(!p6&&p7)+(!p7&&p8)+(!p8&&p9)+(!p9&&p2);if(A!==1)continue;
+      if(step===0){if(p2*p4*p6||p4*p6*p8)continue}else{if(p2*p4*p8||p2*p6*p8)continue}
+      del.push(p)}
+    if(del.length){changed=true;for(const p of del)b[p]=0}}
+    pts=pts.filter(p=>b[p])}}
+/* trace skeleton into strokes (arrays of x,y) */
+function trace(b,w,h){const N=[-w-1,-w,-w+1,-1,1,w-1,w,w+1],vis=new Uint8Array(w*h),strokes=[];
+  const deg=p=>{let c=0;for(const o of N)if(b[p+o])c++;return c};
+  const walk=s=>{const path=[s];vis[s]=1;let cur=s,prev=-1;
+    for(;;){let best=-1,bs=-1e9;const cx=cur%w,cy=(cur/w)|0;
+      for(const o of N){const q=cur+o;if(!b[q]||vis[q])continue;let sc=0;
+        if(prev>=0){const dx=cx-prev%w,dy=cy-((prev/w)|0);sc=(q%w-cx)*dx+(((q/w)|0)-cy)*dy}
+        if(sc>bs){bs=sc;best=q}}
+      if(best<0)break;vis[best]=1;path.push(best);prev=cur;cur=best}
+    return path};
+  for(let i=w;i<w*h-w;i++)if(b[i]&&!vis[i]&&deg(i)===1)strokes.push(walk(i));
+  for(let i=w;i<w*h-w;i++)if(b[i]&&!vis[i])strokes.push(walk(i));
+  return strokes.filter(s=>s.length>=5).map(s=>{const a=new Float32Array(s.length*2);s.forEach((p,j)=>{a[2*j]=p%w+.5;a[2*j+1]=((p/w)|0)+.5});return a})}
+/* multi-octave value noise at low resolution, normalised 0..1 */
+function noiseMap(w,h,base,oct,R){const n=new Float32Array(w*h);let amp=1;
+  for(let o=0;o<oct;o++){const gx=Math.ceil(base*2**o)+2,gy=Math.ceil(base*2**o*h/w)+2,L=new Float32Array(gx*gy).map(()=>R());
+    for(let y=0;y<h;y++){const fy=y/h*(gy-2),y0=fy|0,ty=fy-y0;for(let x=0;x<w;x++){const fx=x/w*(gx-2),x0=fx|0,tx=fx-x0;
+      const v=(L[y0*gx+x0]*(1-tx)+L[y0*gx+x0+1]*tx)*(1-ty)+(L[(y0+1)*gx+x0]*(1-tx)+L[(y0+1)*gx+x0+1]*tx)*ty;n[y*w+x]+=v*amp}}amp*=.5}
+  let mn=1e9,mx=-1e9;for(const v of n){if(v<mn)mn=v;if(v>mx)mx=v}for(let i=0;i<n.length;i++)n[i]=(n[i]-mn)/(mx-mn||1);return n}
+
+/* ---------- sample image (drawn in code) ---------- */
+function sampleImage(){const c=mkCanvas(1600,900),x=c.getContext('2d');
+  let g=x.createLinearGradient(0,0,0,900);g.addColorStop(0,'#F3C9A0');g.addColorStop(.55,'#F7E3C4');g.addColorStop(1,'#E9D6B4');x.fillStyle=g;x.fillRect(0,0,1600,900);
+  x.fillStyle='#F2A65A';x.beginPath();x.arc(1180,300,80,0,7);x.fill();
+  const hill=(col,y,a)=>{x.fillStyle=col;x.beginPath();x.moveTo(0,900);x.lineTo(0,y);for(let i=0;i<=16;i++)x.lineTo(i*100,y+Math.sin(i*a)*40);x.lineTo(1600,900);x.fill();x.strokeStyle='#4A3B2E';x.lineWidth=3;x.stroke()};
+  hill('#B9C79A',560,.7);hill('#8FAE7A',650,1.1);hill('#6E9461',760,.9);
+  x.lineWidth=4;x.strokeStyle='#3B2F26';
+  x.fillStyle='#E9E2D2';x.fillRect(420,520,260,170);x.strokeRect(420,520,260,170);
+  x.fillStyle='#B5533C';x.beginPath();x.moveTo(395,525);x.lineTo(550,410);x.lineTo(705,525);x.closePath();x.fill();x.stroke();
+  x.fillStyle='#F6D27A';x.fillRect(460,570,60,50);x.strokeRect(460,570,60,50);x.fillStyle='#7A5236';x.fillRect(580,600,55,90);x.strokeRect(580,600,55,90);
+  x.fillStyle='#6B4A33';x.fillRect(965,470,26,250);x.strokeRect(965,470,26,250);
+  x.fillStyle='#5E8C52';for(const [cx,cy,r] of [[978,430,110],[910,480,70],[1050,485,75]]){x.beginPath();x.arc(cx,cy,r,0,7);x.fill();x.stroke()}
+  x.strokeStyle='#C9B48F';x.lineWidth=26;x.beginPath();x.moveTo(610,690);x.quadraticCurveTo(760,790,700,900);x.stroke();
+  return c}
+
+/* ---------- analysis ---------- */
+function dims(){const long=opts.res===1080?1920:1280;
+  const short=opts.res===1080?1080:720;
+  if(opts.aspect==='169')return {W:long,H:short};
+  if(opts.aspect==='916')return {W:short,H:long};
+  const iw=img.width,ih=img.height;let W,H;if(iw>=ih){W=long;H=Math.round(long*ih/iw)}else{H=long;W=Math.round(long*iw/ih)}
+  return {W:W&~1,H:H&~1}}
+let startPt={x:.5,y:.45};
+async function prepare(){
+  busy=true;setBusy(true);await tick();
+  const {W,H}=dims(),sc=Math.sqrt(W*H/(1920*1080)),R=rng(7);
+  out.width=W;out.height=H;const st=$('stage');st.style.aspectRatio=W+'/'+H;st.style.width=H>W?`min(100%, calc(72vh * ${(W/H).toFixed(4)}))`:'';st.style.alignSelf=H>W?'center':'';
+  const photo=mkCanvas(W,H),pc=photo.getContext('2d');
+  const iw=img.width,ih=img.height;
+  if(opts.aspect!=='orig'){const s=Math.max(W/iw,H/ih),sw=W/s,sh=H/s;pc.drawImage(img,(iw-sw)/2,(ih-sh)/2,sw,sh,0,0,W,H)}
+  else pc.drawImage(img,0,0,W,H);
+  const P=pc.getImageData(0,0,W,H).data,N=W*H;
+  let g=new Float32Array(N);for(let i=0;i<N;i++)g[i]=.299*P[4*i]+.587*P[4*i+1]+.114*P[4*i+2];
+  const hist=new Uint32Array(256);for(const v of g)hist[v|0]++;let acc=0,lo=0,hi=255;
+  for(let i=0;i<256;i++){acc+=hist[i];if(acc<N*.01)lo=i;if(acc<N*.99)hi=i}
+  for(let i=0;i<N;i++)g[i]=Math.min(255,Math.max(0,(g[i]-lo)/Math.max(1,hi-lo)*255));
+  g=blur(g,W,H,.8*sc);await tick();
+  const inv=g.map(v=>255-v),b4=blur(inv,W,H,4*sc);await tick();const b18=blur(inv,W,H,18*sc);await tick();
+  /* density: fine = more, lighter lines; bold = fewer but darker, wider lines */
+  const ex={fine:1.2,normal:1.5,bold:2.3}[opts.density],thr={fine:.93,normal:.862,bold:.80}[opts.density];
+  const fine=new Float32Array(N),sk=new Float32Array(N),bin=new Uint8Array(N);
+  for(let i=0;i<N;i++){const d4=Math.min(1,g[i]*256/Math.max(1,255-b4[i])/255),d18=Math.min(1,g[i]*256/Math.max(1,255-b18[i])/255);
+    fine[i]=Math.pow(d4,ex);sk[i]=Math.min(fine[i],.35+.65*Math.pow(d18,1.2));bin[i]=d4<thr?1:0}
+  const sepia=opts.tone==='sepia';
+  const paperC=sepia?[244,234,220]:[245,240,233],graph=sepia?[96,64,42]:[62,64,70];
+  const mk=()=>{const c=mkCanvas(W,H);return [c,c.getContext('2d').createImageData(W,H)]};
+  const [paper,pd]=mk(),[lineC,ld]=mk(),[sketchC,sd]=mk(),[photoL,pld]=mk();
+  for(let i=0;i<N;i++){const gr=.975+.025*R(),il=1-fine[i],is=1-sk[i],o=4*i;
+    for(let c=0;c<3;c++){const p=paperC[c]*gr;pd.data[o+c]=p;ld.data[o+c]=p*(1-il)+graph[c]*il;sd.data[o+c]=p*(1-is)+graph[c]*is;
+      pld.data[o+c]=P[o+c]*(1-.5*il*(1-graph[c]/255))}
+    pd.data[o+3]=ld.data[o+3]=sd.data[o+3]=pld.data[o+3]=255}
+  paper.getContext('2d').putImageData(pd,0,0);lineC.getContext('2d').putImageData(ld,0,0);
+  sketchC.getContext('2d').putImageData(sd,0,0);photoL.getContext('2d').putImageData(pld,0,0);
+  await tick();
+  /* line strokes */
+  removeSmall(bin,W,H,Math.round(20*sc*sc));await tick();thin(bin,W,H);await tick();removeSmall(bin,W,H,8);
+  const strokes=trace(bin,W,H);await tick();
+  /* brush paths along the image flow */
+  const gb=blur(g,W,H,6*sc),gx=new Float32Array(N),gy=new Float32Array(N);
+  for(let y=1;y<H-1;y++)for(let x=1;x<W-1;x++){const i=y*W+x;
+    gx[i]=(gb[i-W+1]+2*gb[i+1]+gb[i+W+1])-(gb[i-W-1]+2*gb[i-1]+gb[i+W-1]);
+    gy[i]=(gb[i+W-1]+2*gb[i+W]+gb[i+W+1])-(gb[i-W-1]+2*gb[i-W]+gb[i-W+1])}
+  const jxx=blur(gx.map((v)=>v*v),W,H,18*sc),jyy=blur(gy.map(v=>v*v),W,H,18*sc),jxy=blur(gx.map((v,i)=>v*gy[i]),W,H,18*sc);
+  await tick();
+  const brushes=[],sp=27*sc,step=5*sc;
+  for(let y0=0;y0<H+sp;y0+=sp)for(let x0=0;x0<W+sp;x0+=sp){
+    let x=x0+(R()-.5)*sp,y=y0+(R()-.5)*sp;const L=(70+80*R())*sc,n=Math.max(3,Math.round(L/step)),pts=[x,y];let vx=0,vy=0;
+    for(let k=0;k<n;k++){const xi=Math.min(W-1,Math.max(0,x|0)),yi=Math.min(H-1,Math.max(0,y|0)),i=yi*W+xi;
+      const a=.5*Math.atan2(2*jxy[i],jxx[i]-jyy[i])+Math.PI/2;let dx=Math.cos(a),dy=Math.sin(a);
+      if(k&&dx*vx+dy*vy<0){dx=-dx;dy=-dy}vx=dx;vy=dy;x+=step*dx;y+=step*dy;pts.push(x,y)}
+    const m=pts.length/2,ox=(pts[pts.length-2]-pts[0])/2,oy=(pts[pts.length-1]-pts[1])/2;
+    for(let j=0;j<m;j++){pts[2*j]-=ox;pts[2*j+1]-=oy}
+    const w=(32+22*R())*sc,br=[];for(let k=0;k<5;k++)br.push({off:(R()-.5)*w*.95,wf:.12+.12*R()});
+    brushes.push({pts:new Float32Array(pts),w,br,rnd:R()*.08})}
+  const w4=Math.ceil(W/4),h4=Math.ceil(H/4);
+  G={W,H,sc,photo,photoL,paper,lineC,sketchC,strokes,brushes,w4,h4,Tf:noiseMap(w4,h4,6,5,R),
+     frame:mkCanvas(W,H),tmp:mkCanvas(W,H),lineMask:mkCanvas(W,H),colorMask:mkCanvas(W,H),fillC:mkCanvas(w4,h4)};
+  G.fillImg=G.fillC.getContext('2d').createImageData(w4,h4);
+  order();busy=false;setBusy(false);drawIdle();updateMarker()}
+
+/* sort strokes and brushes from the start point outward */
+function order(){if(!G)return;const {W,H,sc}=G,CX=startPt.x*W,CY=startPt.y*H;
+  const S=G.strokes,n=S.length,st=new Float32Array(2*n),en=new Float32Array(2*n),fd=new Float32Array(n),left=new Uint8Array(n).fill(1);
+  S.forEach((s,i)=>{st[2*i]=s[0];st[2*i+1]=s[1];en[2*i]=s[s.length-2];en[2*i+1]=s[s.length-1];let mx=0,my=0;const m=s.length/2;
+    for(let j=0;j<m;j++){mx+=s[2*j];my+=s[2*j+1]}fd[i]=Math.hypot((mx/m-CX)/W,(my/m-CY)/H)*2600*sc});
+  let cx=CX,cy=CY;const ord=[];
+  for(let k=0;k<n;k++){let best=-1,bd=1e18,rev=false;
+    for(let i=0;i<n;i++){if(!left[i])continue;const ds=Math.hypot(st[2*i]-cx,st[2*i+1]-cy),de=Math.hypot(en[2*i]-cx,en[2*i+1]-cy),d=Math.min(ds,de)+fd[i];
+      if(d<bd){bd=d;best=i;rev=de<ds}}
+    left[best]=0;let s=S[best];if(rev){const r=new Float32Array(s.length),m=s.length/2;for(let j=0;j<m;j++){r[2*j]=s[2*(m-1-j)];r[2*j+1]=s[2*(m-1-j)+1]}s=r}
+    ord.push(s);cx=s[s.length-2];cy=s[s.length-1]}
+  G.ordered=ord;G.offs=[0];for(const s of ord)G.offs.push(G.offs[G.offs.length-1]+s.length/2);G.total=G.offs[G.offs.length-1];
+  for(const b of G.brushes){const m=b.pts.length/2;let mx=0,my=0;for(let j=0;j<m;j++){mx+=b.pts[2*j];my+=b.pts[2*j+1]}
+    const x=mx/m/W,y=my/m/H,d=Math.hypot(x-CX/W,y-CY/H);
+    b.key=opts.paint==='in'?(1.5-d)+b.rnd:opts.paint==='left'?x+.15*y+b.rnd*1.5:opts.paint==='top'?y+.15*x+b.rnd*1.5:d+b.rnd}
+  G.brushes.sort((a,b)=>a.key-b.key);G.boffs=[0];for(const b of G.brushes)G.boffs.push(G.boffs[G.boffs.length-1]+b.pts.length/2);G.btotal=G.boffs[G.boffs.length-1]}
+
+/* ---------- animation ---------- */
+function timeline(){const k=opts.dur/24;return {L0:.3*k,L1:11.5*k,F0:10*k,F1:13*k,B0:12.5*k,B1:20*k,G0:19.5*k,G1:21.5*k,D:opts.dur}}
+function resetAnim(){const {W,H}=G;for(const c of [G.lineMask,G.colorMask])c.getContext('2d').clearRect(0,0,W,H);A={drawn:0,si:0,bdone:0,bi:0}}
+function strokePart(ctx,pts,a,b,ox,oy){ctx.beginPath();const s=Math.max(a-1,0);ctx.moveTo(pts[2*s]+(ox?ox[s]:0),pts[2*s+1]+(oy?oy[s]:0));
+  for(let j=s+1;j<b;j++)ctx.lineTo(pts[2*j]+(ox?ox[j]:0),pts[2*j+1]+(oy?oy[j]:0));ctx.stroke()}
+function renderFrame(t){const T=timeline(),{W,H,sc}=G,CX=startPt.x*W,CY=startPt.y*H;
+  /* 1. pencil strokes */
+  const target=Math.floor(G.total*ss((t-T.L0)/(T.L1-T.L0)));
+  const lm=G.lineMask.getContext('2d');lm.strokeStyle='#fff';lm.lineWidth={fine:5,normal:6,bold:8}[opts.density]*sc;lm.lineCap='round';lm.lineJoin='round';
+  while(A.drawn<target&&A.si<G.ordered.length){const s=G.ordered[A.si],o=G.offs[A.si],m=s.length/2,a=A.drawn-o,b=Math.min(m,target-o);
+    if(a<b){strokePart(lm,s,a,b);A.drawn=o+b}if(b>=m)A.si++;else break}
+  /* 2. brush colour strokes */
+  const bt=Math.floor(G.btotal*Math.min(1,Math.max(0,(t-T.B0)/(T.B1-T.B0))));
+  const cm=G.colorMask.getContext('2d');cm.strokeStyle='#fff';cm.lineCap='round';cm.lineJoin='round';
+  while(A.bdone<bt&&A.bi<G.brushes.length){const br=G.brushes[A.bi],o=G.boffs[A.bi],m=br.pts.length/2,a=A.bdone-o,b=Math.min(m,bt-o);
+    if(a<b){if(!br.nx){br.nx=new Float32Array(m);br.ny=new Float32Array(m);for(let j=0;j<m;j++){const j0=Math.max(0,j-1),j1=Math.min(m-1,j+1);
+        let dx=br.pts[2*j1]-br.pts[2*j0],dy=br.pts[2*j1+1]-br.pts[2*j0+1];const l=Math.hypot(dx,dy)||1;br.nx[j]=-dy/l;br.ny[j]=dx/l}}
+      cm.globalAlpha=1;cm.lineWidth=br.w*.95;strokePart(cm,br.pts,a,b);
+      cm.globalAlpha=.85;for(const q of br.br){cm.lineWidth=br.w*q.wf;strokePart(cm,br.pts,a,b,br.nx.map(v=>v*q.off),br.ny.map(v=>v*q.off))}
+      cm.globalAlpha=1;A.bdone=o+b}
+    if(b>=m)A.bi++;else break}
+  /* compose */
+  const f=G.frame.getContext('2d'),tp=G.tmp.getContext('2d');
+  f.globalCompositeOperation='source-over';f.globalAlpha=1;f.drawImage(G.paper,0,0);
+  tp.globalCompositeOperation='source-over';tp.clearRect(0,0,W,H);tp.filter=`blur(${(1*sc).toFixed(2)}px)`;tp.drawImage(G.lineMask,0,0);tp.filter='none';
+  tp.globalCompositeOperation='source-in';tp.drawImage(G.lineC,0,0);tp.globalCompositeOperation='source-over';f.drawImage(G.tmp,0,0);
+  const fp=ss((t-T.F0)/(T.F1-T.F0));
+  if(fp>0){const d=G.fillImg.data,Tf=G.Tf;for(let i=0;i<Tf.length;i++){d[4*i]=d[4*i+1]=d[4*i+2]=255;d[4*i+3]=255*ss((fp*1.4-Tf[i])/.4)}
+    G.fillC.getContext('2d').putImageData(G.fillImg,0,0);
+    tp.clearRect(0,0,W,H);tp.imageSmoothingEnabled=true;tp.drawImage(G.fillC,0,0,W,H);tp.globalCompositeOperation='source-in';tp.drawImage(G.sketchC,0,0);
+    tp.globalCompositeOperation='source-over';f.globalCompositeOperation='darken';f.drawImage(G.tmp,0,0);f.globalCompositeOperation='source-over'}
+  const gl=ss((t-T.G0)/(T.G1-T.G0));
+  if(A.bdone>0){tp.clearRect(0,0,W,H);tp.drawImage(G.photoL,0,0);if(gl>0){tp.globalAlpha=gl;tp.drawImage(G.photo,0,0);tp.globalAlpha=1}
+    tp.globalCompositeOperation='destination-in';tp.filter=`blur(${(3*sc).toFixed(2)}px)`;tp.drawImage(G.colorMask,0,0);tp.filter='none';
+    tp.globalCompositeOperation='source-over';f.drawImage(G.tmp,0,0)}
+  if(gl>0){f.globalAlpha=gl;f.drawImage(G.photo,0,0);f.globalAlpha=1}
+  /* slow push-in at the end */
+  const z=1+.03*Math.max(0,t-T.G0)/(T.D-T.G0);
+  octx.setTransform(1,0,0,1,0,0);
+  if(z>1){octx.setTransform(z,0,0,z,CX*(1-z),CY*(1-z))}
+  octx.drawImage(G.frame,0,0);octx.setTransform(1,0,0,1,0,0);
+  showPhase(t,T)}
+function showPhase(t,T){const p=t<T.F0?'line':t<T.B0?'shade':t<T.G1?'paint':'done';
+  document.querySelectorAll('.phase').forEach(e=>e.classList.toggle('on',e.dataset.p===p));
+  $('time').textContent=`${t.toFixed(1)} / ${T.D.toFixed(1)}초`}
+function drawIdle(){if(!G)return;octx.setTransform(1,0,0,1,0,0);octx.drawImage(G.photo,0,0);
+  document.querySelectorAll('.phase').forEach(e=>e.classList.remove('on'));$('time').textContent=`0.0 / ${opts.dur.toFixed(1)}초`}
+
+/* ---------- preview ---------- */
+async function play(){if(!G||busy)return;playing=true;setControls();resetAnim();const t0=performance.now();
+  $('hint').hidden=true;$('marker').hidden=true;
+  while(playing){const t=(performance.now()-t0)/1000;if(t>=opts.dur){renderFrame(opts.dur);break}renderFrame(t);await new Promise(r=>requestAnimationFrame(r))}
+  playing=false;setControls();$('marker').hidden=false}
+function stop(){playing=false;setTimeout(()=>{drawIdle();$('hint').hidden=false;$('marker').hidden=false},50)}
+
+/* ---------- export ---------- */
+async function pickCodec(W,H){for(const c of ['avc1.640028','avc1.4d0028','avc1.42002a','avc1.640033']){
+  try{const s=await VideoEncoder.isConfigSupported({codec:c,width:W,height:H,bitrate:10e6,framerate:FPS});if(s.supported)return c}catch(e){}}return null}
+async function make(){if(!G||busy)return;busy=true;setControls();resultBlob=null;$('result').hidden=true;
+  $('hint').hidden=true;$('marker').hidden=true;const {W,H}=G,N=Math.round(opts.dur*FPS);
+  try{
+    const codec=('VideoEncoder' in window&&window.Mp4Muxer)?await pickCodec(W,H):null;
+    if(!codec){await recordFallback();return}
+    msg('영상을 만드는 중… 0%');
+    const target=new Mp4Muxer.ArrayBufferTarget();
+    const muxer=new Mp4Muxer.Muxer({target,video:{codec:'avc',width:W,height:H,frameRate:FPS},fastStart:'in-memory'});
+    let err=null;const enc=new VideoEncoder({output:(c,m)=>muxer.addVideoChunk(c,m),error:e=>{err=e}});
+    enc.configure({codec,width:W,height:H,bitrate:W*H>=1.5e6?12e6:7e6,framerate:FPS});
+    resetAnim();const t0=performance.now();
+    for(let i=0;i<N;i++){renderFrame(i/FPS);
+      const vf=new VideoFrame(out,{timestamp:Math.round(i*1e6/FPS),duration:Math.round(1e6/FPS)});
+      enc.encode(vf,{keyFrame:i%(FPS*2)===0});vf.close();if(err)throw err;
+      while(enc.encodeQueueSize>6)await sleep(2);
+      if(i%3===0){const p=(i+1)/N;$('prog').style.width=(p*100).toFixed(1)+'%';msg(`영상을 만드는 중… ${Math.round(p*100)}%`);await tick()}}
+    await enc.flush();enc.close();muxer.finalize();if(err)throw err;
+    resultBlob=new Blob([target.buffer],{type:'video/mp4'});resultExt='mp4';
+    done(((performance.now()-t0)/1000).toFixed(0))
+  }catch(e){console.error(e);msg('영상을 만들지 못했습니다. 해상도를 720p로 낮춰 다시 시도하거나, 크롬·엣지 최신 버전에서 열어 주세요. ('+(e.message||e)+')','err')}
+  finally{busy=false;setControls();$('marker').hidden=false}}
+async function recordFallback(){
+  const types=['video/mp4;codecs=avc1','video/mp4','video/webm;codecs=vp9','video/webm'],type=types.find(t=>window.MediaRecorder&&MediaRecorder.isTypeSupported(t));
+  if(!type){msg('이 브라우저는 영상 저장을 지원하지 않습니다. 크롬이나 엣지에서 열어 주세요.','err');return}
+  msg('이 브라우저는 실시간 녹화로 만듭니다. 영상 길이만큼 기다려 주세요.');
+  const rec=new MediaRecorder(out.captureStream(FPS),{mimeType:type,videoBitsPerSecond:10e6}),chunks=[];
+  rec.ondataavailable=e=>e.data.size&&chunks.push(e.data);const stopped=new Promise(r=>rec.onstop=r);
+  resetAnim();rec.start(250);const t0=performance.now();
+  for(;;){const t=(performance.now()-t0)/1000;if(t>=opts.dur){renderFrame(opts.dur);break}renderFrame(t);
+    $('prog').style.width=(t/opts.dur*100).toFixed(1)+'%';await new Promise(r=>requestAnimationFrame(r))}
+  await sleep(300);rec.stop();await stopped;
+  resultExt=type.includes('mp4')?'mp4':'webm';resultBlob=new Blob(chunks,{type:type.split(';')[0]});done(opts.dur)}
+function done(sec){$('prog').style.width='100%';
+  msg(`완성했습니다. ${(resultBlob.size/1048576).toFixed(1)}MB · ${G.W}×${G.H} · ${opts.dur}초 · ${resultExt.toUpperCase()} (제작 ${sec}초)`,'ok');
+  const v=$('vid');try{v.src=URL.createObjectURL(resultBlob);v.onerror=()=>{v.hidden=true}}catch(e){v.hidden=true}
+  $('result').hidden=false}
+async function save(){if(!resultBlob)return;
+  const name=`sketch-intro_${G.W}x${G.H}_${opts.dur}s.${resultExt}`;const dl=await dlP;
+  if(dl){try{await dl.save({filename:name,data:resultBlob});msg('저장했습니다: '+name,'ok')}
+    catch(e){msg(e&&e.code==='declined'?'저장을 취소했습니다.':'저장하지 못했습니다. 다시 시도해 주세요. ('+(e&&e.code||e)+')','err')}return}
+  const a=document.createElement('a');a.href=URL.createObjectURL(resultBlob);a.download=name;document.body.appendChild(a);a.click();a.remove();msg('저장했습니다: '+name,'ok')}
+
+/* ---------- UI ---------- */
+function msg(t,cls){const m=$('msg');m.textContent=t;m.className='msg'+(cls?' '+cls:'')}
+function setBusy(b){$('busy').hidden=!b;setControls()}
+function setControls(){const dis=busy||playing;$('play').disabled=dis||!G;$('stop').disabled=!playing;$('make').disabled=dis||!G;$('center').disabled=dis;
+  document.querySelectorAll('.seg button').forEach(b=>b.disabled=dis)}
+function updateMarker(){if(!G)return;const r=out.getBoundingClientRect(),s=$('stage').getBoundingClientRect(),m=$('marker');
+  m.style.left=(r.left-s.left+startPt.x*r.width)+'px';m.style.top=(r.top-s.top+startPt.y*r.height)+'px';m.hidden=playing;
+  $('pt').textContent=`가로 ${Math.round(startPt.x*100)}% · 세로 ${Math.round(startPt.y*100)}%`}
+$('stage').addEventListener('click',e=>{if(!G||busy||playing)return;const r=out.getBoundingClientRect();
+  const x=(e.clientX-r.left)/r.width,y=(e.clientY-r.top)/r.height;if(x<0||x>1||y<0||y>1)return;startPt={x,y};order();drawIdle();updateMarker();
+  $('result').hidden=true;msg('시작점을 바꿨습니다. 미리보기로 확인해 보세요.')});
+$('center').onclick=()=>{startPt={x:.5,y:.45};order();updateMarker()};
+$('play').onclick=play;$('stop').onclick=stop;$('make').onclick=make;$('save').onclick=save;
+document.querySelectorAll('.seg').forEach(seg=>seg.addEventListener('click',async e=>{const b=e.target.closest('button');if(!b||b.disabled)return;
+  seg.querySelectorAll('button').forEach(x=>x.setAttribute('aria-pressed',x===b?'true':'false'));
+  const k=seg.dataset.opt,v=b.dataset.v;opts[k]=(k==='dur'||k==='res')?+v:v;$('result').hidden=true;
+  if(k==='dur'){drawIdle();return}if(k==='paint'){order();drawIdle();updateMarker();msg('채색 방향을 바꿨습니다. 미리보기로 확인해 보세요.');return}await prepare()}));
+function loadFile(f){if(!f||!f.type.startsWith('image/')){msg('이미지 파일(JPG, PNG, WEBP)을 골라 주세요.','err');return}
+  const im=new Image();im.onload=async()=>{img=im;$('fname').textContent=`${f.name} · ${im.width}×${im.height}`;startPt={x:.5,y:.45};$('result').hidden=true;
+    await prepare();msg('시작점을 클릭한 뒤 미리보기나 만들기를 누르세요.')};
+  im.onerror=()=>msg('이미지를 열지 못했습니다. 다른 파일로 시도해 주세요.','err');im.src=URL.createObjectURL(f)}
+const drop=$('drop');drop.onclick=()=>$('file').click();drop.onkeydown=e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();$('file').click()}};
+$('file').onchange=e=>loadFile(e.target.files[0]);
+['dragenter','dragover'].forEach(ev=>document.addEventListener(ev,e=>{e.preventDefault();drop.classList.add('over')}));
+['dragleave','drop'].forEach(ev=>document.addEventListener(ev,e=>{e.preventDefault();if(ev==='drop'||e.target===document.documentElement)drop.classList.remove('over')}));
+document.addEventListener('drop',e=>{const f=e.dataTransfer&&e.dataTransfer.files[0];if(f)loadFile(f)});
+window.addEventListener('resize',updateMarker);
+(async()=>{img=sampleImage();startPt={x:.34,y:.62};await prepare()})();
+window.__SIM={opts,renderAt:t=>{resetAnim();for(let x=0;x<=t;x+=1/FPS)renderFrame(x)},get G(){return G},make,get blob(){return resultBlob},setStart:(x,y)=>{startPt={x,y};order()}};
+</script>
+
+</body>
+</html>
